@@ -1,7 +1,7 @@
-# ProjectAI -- AI-Powered Code Editor (PyQt6)
+# ProjectAI -- AI-Powered Code Editor
 
-A modern, feature-rich code editor with integrated AI assistance, built
-with **PyQt6**.\
+A modern, feature-rich code editor with integrated AI assistance
+
 Designed for developers who want intelligent coding support with
 professional editing tools.
 
@@ -105,17 +105,15 @@ Additional tools:\
 ### Requirements
 
     Python 3.10+
-    PyQt6
-    Google Generative AI
 
 ### Install Dependencies
 
 ``` bash
-pip install -r requirements.txt
+py -m pip install PyQt6 qdarktheme chardet google-generativeai
 ```
 
 `requirements.txt`:
-
+    
     PyQt6>=6.0.0
     qdarktheme>=2.1.0
     chardet>=5.0.0
@@ -127,9 +125,9 @@ pip install -r requirements.txt
 ## 🚀 Quick Start
 
 ``` bash
-git clone https://github.com/yourusername/ProjectAI.git
+git clone https://github.com/gilfernandes234/ProjectAI.git
 cd ProjectAI
-pip install -r requirements.txt
+py -m pip install PyQt6 qdarktheme chardet google-generativeai
 python ProjectAI.py
 ```
 
@@ -178,10 +176,7 @@ python ProjectAI.py
     ├── ai_providers/
     │   ├── __init__.py
     │   ├── base_ai.py
-    │   ├── gemini_ai.py
-    │   ├── claude_ai.py
-    │   └── openai_ai.py
-    ├── requirements.txt
+    │   └── gemini_ai.py
     └── README.md
 
 ### Adding New AI Providers
@@ -243,8 +238,6 @@ This project is licensed under the **MIT License**.
 ------------------------------------------------------------------------
 
 ## 📧 Contact
-
-**Your Name** -- @yourtwitter\
-Project Link: https://github.com/yourusername/ProjectAI
+Project Link: https://github.com/gilfernandes234/ProjectAi-Editor
 
 ⭐ *Star this repository if you found it useful!*
