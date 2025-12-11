@@ -1,4 +1,5 @@
-#  py -m pip install  --upgrade google-generativeai
+# py -m pip install PyQt6 qdarktheme chardet google-generativeai pygments  openai
+
 
 import sys
 import os
@@ -9,8 +10,14 @@ import chardet
 import re
 import difflib
 
-from ai_providers import BaseAI, GeminiAI
-from ai_providers.base_ai import AIThread
+from pygments import highlight
+from pygments.lexers import get_lexer_by_name
+from pygments.formatters import HtmlFormatter
+from data import BaseAI, GeminiAI, PerplexityAI, DiffViewerDialog
+
+from data.base_ai import AIThread
+
+
 
 from PyQt6.QtGui import (QAction, QFont, QSyntaxHighlighter, QTextCharFormat, 
                         QColor, QKeySequence, QFileSystemModel, QTextCursor, QTextDocument)
@@ -22,246 +29,10 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QFileDialog,
                              QStatusBar, QMessageBox, QTabWidget, QComboBox, QLabel,
                              QTreeView, QSplitter, QPushButton, QLineEdit, 
                              QScrollArea, QFrame, QHBoxLayout, QCheckBox, QColorDialog,
-                             QDialog, QListWidget)
+                             QDialog, QListWidget, QPlainTextEdit)
                              
                              
-class DiffViewerDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Comparar Arquivos")
-        self.setGeometry(100, 100, 1200, 700)
-        self.showMaximized()       
-        self.left_content = ""
-        self.right_content = ""
-        self.left_name = ""
-        self.right_name = ""
-        
-        self.setup_ui()
-    
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(5)  # Reduzir espaçamento entre widgets
-        
-        # ===== Seção de Seleção (compacta) =====
-        selection_widget = QWidget()
-        selection_widget.setMaximumHeight(120)  # LIMITAR altura da seção de seleção
-        selection_layout = QHBoxLayout(selection_widget)
-        
-        # Seleção esquerda
-        left_group = QVBoxLayout()
-        left_label = QLabel("Arquivo Original:")
-        self.left_file_label = QLabel("Nenhum arquivo selecionado")
-        self.left_file_label.setStyleSheet("color: #888; font-size: 10px;")
-        left_btn = QPushButton("Selecionar Arquivo Original")
-        left_btn.clicked.connect(lambda: self.select_file('left'))
-        left_group.addWidget(left_label)
-        left_group.addWidget(self.left_file_label)
-        left_group.addWidget(left_btn)
-        
-        # Seleção direita
-        right_group = QVBoxLayout()
-        right_label = QLabel("Arquivo Modificado:")
-        self.right_file_label = QLabel("Nenhum arquivo selecionado")
-        self.right_file_label.setStyleSheet("color: #888; font-size: 10px;")
-        right_btn = QPushButton("Selecionar Arquivo Modificado")
-        right_btn.clicked.connect(lambda: self.select_file('right'))
-        right_group.addWidget(right_label)
-        right_group.addWidget(self.right_file_label)
-        right_group.addWidget(right_btn)
-        
-        selection_layout.addLayout(left_group)
-        selection_layout.addLayout(right_group)
-        layout.addWidget(selection_widget)
-        
-        # ===== Botão de comparar (compacto) =====
-        compare_widget = QWidget()
-        compare_widget.setMaximumHeight(50)  # LIMITAR altura
-        compare_layout = QVBoxLayout(compare_widget)
-        compare_layout.setContentsMargins(0, 0, 0, 0)
-        
-        compare_btn = QPushButton("Comparar")
-        compare_btn.clicked.connect(self.compare_files)
-        compare_btn.setStyleSheet("background-color: #0e639c; padding: 8px; font-weight: bold;")
-        compare_layout.addWidget(compare_btn)
-        layout.addWidget(compare_widget)
-        
-        # ===== Estatísticas (compacta) =====
-        self.stats_label = QLabel("")
-        self.stats_label.setStyleSheet("color: #888; padding: 5px;")
-        self.stats_label.setMaximumHeight(30)  # LIMITAR altura
-        layout.addWidget(self.stats_label)
-        
-        # ===== EDITORES (OCUPAM TODO O ESPAÇO RESTANTE) =====
-        diff_splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Editor esquerdo
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
-        
-        self.left_title = QLabel("Original")
-        self.left_title.setStyleSheet("background-color: #2d2d2d; padding: 8px; font-weight: bold; font-size: 13px;")
-        self.left_title.setMaximumHeight(32)
-        
-        self.left_editor = QTextEdit()
-        self.left_editor.setReadOnly(True)
-        self.left_editor.setFont(QFont("Consolas", 10))
-        self.left_editor.setStyleSheet("background-color: #1e1e1e;")
-        
-        left_layout.addWidget(self.left_title)
-        left_layout.addWidget(self.left_editor)  # Vai ocupar todo espaço restante
-        
-        # Editor direito
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-        
-        self.right_title = QLabel("Modificado")
-        self.right_title.setStyleSheet("background-color: #2d2d2d; padding: 8px; font-weight: bold; font-size: 13px;")
-        self.right_title.setMaximumHeight(32)
-        
-        self.right_editor = QTextEdit()
-        self.right_editor.setReadOnly(True)
-        self.right_editor.setFont(QFont("Consolas", 10))
-        self.right_editor.setStyleSheet("background-color: #1e1e1e;")
-        
-        right_layout.addWidget(self.right_title)
-        right_layout.addWidget(self.right_editor)  # Vai ocupar todo espaço restante
-        
-        diff_splitter.addWidget(left_container)
-        diff_splitter.addWidget(right_container)
-        diff_splitter.setSizes([600, 600])
-        
-        # ADICIONAR com stretch=100 para ocupar MÁXIMO espaço
-        layout.addWidget(diff_splitter, stretch=100)  # <-- IMPORTANTE
-        
-        # ===== Botão fechar (compacto) =====
-        close_btn = QPushButton("Fechar")
-        close_btn.clicked.connect(self.close)
-        close_btn.setMaximumHeight(35)
-        layout.addWidget(close_btn, stretch=0)  # <-- stretch=0 = não expandir
 
-    def select_file(self, side):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            f"Selecionar Arquivo {'Original' if side == 'left' else 'Modificado'}",
-            "",
-            "Todos os Arquivos (*)"
-        )
-        
-        if file_path:
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                
-                file_name = os.path.basename(file_path)
-                
-                if side == 'left':
-                    self.left_content = content
-                    self.left_name = file_name
-                    self.left_file_label.setText(file_path)
-                else:
-                    self.right_content = content
-                    self.right_name = file_name
-                    self.right_file_label.setText(file_path)
-                    
-            except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao ler arquivo: {str(e)}")
-    
-    def set_files_from_tabs(self, left_content, left_name, right_content, right_name):
-        self.left_content = left_content
-        self.left_name = left_name
-        self.right_content = right_content
-        self.right_name = right_name
-        
-        self.left_file_label.setText(f"Aba: {left_name}")
-        self.right_file_label.setText(f"Aba: {right_name}")
-        
-        # Comparar automaticamente
-        self.compare_files()
-    
-    def compare_files(self):
-        if not self.left_content or not self.right_content:
-            QMessageBox.warning(self, "Aviso", "Selecione ambos os arquivos para comparar")
-            return
-        
-        # Atualizar títulos
-        self.left_title.setText(f"Original: {self.left_name}")
-        self.right_title.setText(f"Modificado: {self.right_name}")
-        
-        # Calcular diferenças
-        left_lines = self.left_content.splitlines()
-        right_lines = self.right_content.splitlines()
-        
-        differ = difflib.Differ()
-        diff = list(differ.compare(left_lines, right_lines))
-        
-        # Contar alterações
-        additions = sum(1 for line in diff if line.startswith('+ '))
-        deletions = sum(1 for line in diff if line.startswith('- '))
-        
-        self.stats_label.setText(
-            f"Adições: <span style='color: #4caf50;'>{additions}</span> | "
-            f"Remoções: <span style='color: #f44336;'>{deletions}</span>"
-        )
-        
-        # Renderizar diff com cores
-        self.render_diff(left_lines, right_lines, diff)
-    
-    def render_diff(self, left_lines, right_lines, diff):
-        left_html = []
-        right_html = []
-        
-        left_idx = 0
-        right_idx = 0
-        
-        for line in diff:
-            if line.startswith('  '):  # Linha igual
-                content = line[2:]
-                left_html.append(f"<div style='padding: 2px;'>{self.escape_html(content)}</div>")
-                right_html.append(f"<div style='padding: 2px;'>{self.escape_html(content)}</div>")
-                left_idx += 1
-                right_idx += 1
-                
-            elif line.startswith('- '):  # Linha removida (só no original)
-                content = line[2:]
-                left_html.append(
-                    f"<div style='background-color: #4d1f1f; padding: 2px; border-left: 3px solid #f44336;'>"
-                    f"{self.escape_html(content)}</div>"
-                )
-                right_html.append("<div style='padding: 2px; background-color: #2d2d2d;'>&nbsp;</div>")
-                left_idx += 1
-                
-            elif line.startswith('+ '):  # Linha adicionada (só no modificado)
-                content = line[2:]
-                left_html.append("<div style='padding: 2px; background-color: #2d2d2d;'>&nbsp;</div>")
-                right_html.append(
-                    f"<div style='background-color: #1f4d1f; padding: 2px; border-left: 3px solid #4caf50;'>"
-                    f"{self.escape_html(content)}</div>"
-                )
-                right_idx += 1
-        
-        # Aplicar HTML aos editores
-        self.left_editor.setHtml(''.join(left_html))
-        self.right_editor.setHtml(''.join(right_html))
-        
-        # Sincronizar scroll
-        self.sync_scrollbars()
-    
-    def sync_scrollbars(self):
-        left_scroll = self.left_editor.verticalScrollBar()
-        right_scroll = self.right_editor.verticalScrollBar()
-        
-        left_scroll.valueChanged.connect(right_scroll.setValue)
-        right_scroll.valueChanged.connect(left_scroll.setValue)
-    
-    def escape_html(self, text):
-        return (text.replace('&', '&amp;')
-                   .replace('<', '&lt;')
-                   .replace('>', '&gt;')
-                   .replace(' ', '&nbsp;'))
                              
 class AIChatWidget(QWidget):
     def __init__(self, parent=None):
@@ -271,11 +42,13 @@ class AIChatWidget(QWidget):
         # Provedores disponíveis
         self.available_providers = {
             "Google Gemini": GeminiAI,
+            "Perplexity AI": PerplexityAI,  # <- ADICIONE ESTA LINHA
+
+           
             # "Anthropic Claude": ClaudeAI,  # Descomentar quando implementar
             # "OpenAI GPT": OpenAIAI,        # Descomentar quando implementar
         }
         
-        self.setup_ui()
         self.current_provider: BaseAI = None
         self.conversation_history = []
         self.last_code_suggestion = None
@@ -300,7 +73,6 @@ class AIChatWidget(QWidget):
             QMessageBox.warning(self, "Aviso", "Por favor, insira uma API Key válida")
             return
         
-        # Criar instância do provedor selecionado
         provider_name = self.provider_combo.currentText()
         provider_class = self.available_providers.get(provider_name)
         
@@ -323,6 +95,8 @@ class AIChatWidget(QWidget):
                 
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao conectar: {str(e)}")
+
+
     
     def send_message(self):
         """Envia mensagem para a IA"""
@@ -354,7 +128,7 @@ class AIChatWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Title
-        title_label = QLabel("AI Assistant")
+        title_label = QLabel("AI Assistant (Experimental)")
         title_label.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
         layout.addWidget(title_label)
         
@@ -437,16 +211,6 @@ class AIChatWidget(QWidget):
         clear_btn = QPushButton("Clear Chat")
         clear_btn.clicked.connect(self.clear_chat)
 
-        code_btn = QPushButton("Explain Selection")
-        code_btn.clicked.connect(self.explain_selected_code)
-
-        context_btn = QPushButton("Analyze File")
-        context_btn.clicked.connect(self.analyze_current_file)
-        
-        # Project buttons
-        project_btn = QPushButton("Analyze Project")
-        project_btn.clicked.connect(self.analyze_full_project)
-        project_btn.setToolTip("Analyzes all Lua files in the folder")
         
         apply_btn = QPushButton("Apply Code")
         apply_btn.clicked.connect(self.apply_code_suggestion)
@@ -454,9 +218,6 @@ class AIChatWidget(QWidget):
         apply_btn.setToolTip("Applies the last code suggested by the AI")
 
         buttons_layout.addWidget(clear_btn)
-        buttons_layout.addWidget(code_btn)
-        buttons_layout.addWidget(context_btn)
-        buttons_layout.addWidget(project_btn)
         buttons_layout.addWidget(apply_btn)
         layout.addLayout(buttons_layout)
         
@@ -665,15 +426,6 @@ class AIChatWidget(QWidget):
         
         return project_files
 
-    def analyze_full_project(self):
-        main_window = self.window()
-        if hasattr(main_window, 'working_directory'):
-            self.project_mode_checkbox.setChecked(True)
-            prompt = "Analyze the full structure of this project. List the main files, their functions, and suggest improvements or optimizations that can be made."
-            self.message_input.setPlainText(prompt)
-            self.send_message()
-        else:
-            QMessageBox.information(self, "Info", "Select a working folder first")
     
     def apply_code_suggestion(self):
         if not self.last_code_suggestion:
@@ -717,29 +469,99 @@ class AIChatWidget(QWidget):
         return super().eventFilter(obj, event)
        
     def display_response(self, response):
-        import markdown
+        """Exibe resposta da IA com código formatado em boxes"""
+        import re
+        from html import escape
         
-        code_blocks = re.findall(r'``````', response, re.DOTALL)
-        if code_blocks:
-            self.last_code_suggestion = code_blocks[-1].strip()
+        # Detectar blocos de código ``````
+        code_block_pattern = r'``````'
         
-        # Converter Markdown para HTML
-        html_response = markdown.markdown(
-            response, 
-            extensions=['fenced_code', 'tables', 'nl2br']
-        )
+        def create_code_box(match):
+            language = match.group(1) or 'text'
+            code = match.group(2)
+# Detectar lexer pela linguagem
+            try:
+                from pygments.lexers import get_lexer_by_name
+                from pygments.formatters import HtmlFormatter
+                from pygments import highlight as pygments_highlight
+                
+                if language:
+                    lexer = get_lexer_by_name(language, stripall=True)
+                else:
+                    lexer = get_lexer_by_name('text', stripall=True)
+                
+                formatter = HtmlFormatter(
+                    style='monokai',  # ou 'github-dark', 'dracula'
+                    noclasses=True,   # inline styles
+                    cssclass='',
+                    prestyles='margin: 0; padding: 0; background: transparent;'
+                )
+                escaped_code = pygments_highlight(code, lexer, formatter)
+                # Remove o <div> e <pre> externo do pygments (já temos nossa box)
+                escaped_code = re.sub(r'^<div[^>]*><pre[^>]*>', '', escaped_code)
+                escaped_code = re.sub(r'</pre></div>$', '', escaped_code)
+            except:
+                # Fallback se linguagem não for reconhecida
+                escaped_code = escape(code)
+
+            
+            # ID único para cada bloco
+            import random
+            box_id = f"code_{random.randint(1000, 9999)}"
+            
+            # HTML da box com botão de copiar
+            return f'''
+            <div style="position: relative; margin: 10px 0; background: #2b2b2b; border-radius: 8px; border: 1px solid #3d3d3d;">
+                <div style="display: flex; justify-content: space-between; align-items: center; 
+                            background: #1e1e1e; padding: 8px 12px; border-radius: 8px 8px 0 0; border-bottom: 1px solid #3d3d3d;">
+                    <span style="color: #888; font-size: 12px; font-family: Consolas, monospace;">{language}</span>
+                    <button onclick="copyCode_{box_id}()" id="btn_{box_id}" 
+                            style="background: #3d3d3d; color: #ccc; border: none; padding: 4px 12px; 
+                                   border-radius: 4px; cursor: pointer; font-size: 11px; font-family: Arial;">
+                        📋 Copiar
+                    </button>
+                </div>
+                <pre id="{box_id}" style="margin: 0; padding: 15px; overflow-x: auto; 
+                                          background: #2b2b2b; color: #d4d4d4; 
+                                          font-family: Consolas, Monaco, monospace; font-size: 13px; 
+                                          line-height: 1.5; border-radius: 0 0 8px 8px;"><code>{escaped_code}</code></pre>
+            </div>
+            <script>
+            function copyCode_{box_id}() {{
+                const code = document.getElementById('{box_id}').innerText;
+                const btn = document.getElementById('btn_{box_id}');
+                
+                // Copiar para clipboard (método compatível com Qt)
+                const textarea = document.createElement('textarea');
+                textarea.value = code;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                // Feedback visual
+                btn.innerHTML = '✅ Copiado!';
+                btn.style.background = '#2d5016';
+                setTimeout(() => {{
+                    btn.innerHTML = '📋 Copiar';
+                    btn.style.background = '#3d3d3d';
+                }}, 2000);
+            }}
+            </script>
+            '''
         
-        styled_html = f"""
-        <div style="line-height: 1.6;">
-            {html_response}
-        </div>
-        """
+
+        code_pattern = r'``````'
+        formatted_response = re.sub(code_pattern, create_code_box, response, flags=re.DOTALL)
         
-        self.chat_display.append(f"<b>AI:</b><br>{styled_html}<br>")
+        # Exibir no chat
+        self.chat_display.append(f"<b>AI:</b><br>{formatted_response}<br>")
         self.message_input.setEnabled(True)
         self.message_input.setFocus()
         self.status_label.setText("Ready")
         self.status_label.setStyleSheet("color: #4caf50; padding: 5px;")
+
+        
 
     def update_last_code_suggestion(self, raw_text):
         """Extrai o último bloco de código da resposta da IA para permitir aplicar no editor."""
@@ -811,33 +633,7 @@ class AIChatWidget(QWidget):
         self.chat_display.clear()
         self.conversation_history = []
     
-    def explain_selected_code(self):
-        """Explains the selected code in the editor"""
-        main_window = self.window()
-        if hasattr(main_window, 'tabs'):
-            current_editor = main_window.tabs.currentWidget()
-            if current_editor and isinstance(current_editor, CodeEditor):
-                selected_text = current_editor.textCursor().selectedText()
-                if selected_text:
-                    prompt = "Explain this code in detail"
-                    self.message_input.setPlainText(prompt)
-                    self.send_message()
-                else:
-                    QMessageBox.information(self, "Info", "Select some code first")
     
-    def analyze_current_file(self):
-        main_window = self.window()
-        if hasattr(main_window, 'tabs'):
-            current_editor = main_window.tabs.currentWidget()
-            if current_editor and isinstance(current_editor, CodeEditor):
-                file_path = getattr(current_editor, 'file_path', None)
-                file_name = os.path.basename(file_path) if file_path else "current file"
-                
-                prompt = "Analyze this full code and give me a detailed summary of what it does and its main functions."
-                self.message_input.setPlainText(prompt)
-                self.send_message()
-            else:
-                QMessageBox.information(self, "Info", "No file open")
             
 class SyntaxHighlighter(QSyntaxHighlighter):
     def __init__(self, parent, file_extension):
@@ -1434,12 +1230,15 @@ class CodeEditor(QTextEdit):
             return False
     
     def save_file_as(self, encoding=None):
-        file_path, _ = QFileDialog.getSaveFileName(None, "Save As")
+        file_path, _ = QFileDialog.getSaveFileName(None, 
+        "Save As", 
+        "All Files  (*)"
+        )
         if file_path:
             self.file_path = file_path
             return self.save_file(encoding)
         return False
-    
+         
     def reload_with_encoding(self, encoding):
         """Reload the file with a different encoding"""
         if self.file_path:
