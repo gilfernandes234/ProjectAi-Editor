@@ -116,9 +116,11 @@ https://img.shields.io/badge/Python-3.10+-eenlue
 
 ``` bash
 py -m pip install PyQt6 qdarktheme chardet google-generativeai
+https://ollama.com/download/windows
+
 ```
 
-`requirements.txt`:
+`Requirements:`:
     
     PyQt6>=6.0.0
     qdarktheme>=2.1.0
@@ -145,6 +147,9 @@ python ProjectAI.py
 2.  Select provider\
 3.  Paste your API key\
 4.  Click **Connect**
+
+Gemini AI:
+https://aistudio.google.com/app/api-keys
 
 ------------------------------------------------------------------------
 
@@ -180,8 +185,9 @@ python ProjectAI.py
     ProjectAI/
     ├── ProjectAI.py
     ├── ai_providers/
-    │   ├── __init__.py
+    │   ├── init.py
     │   ├── base_ai.py
+    |   ├── ollama_ai.py
     │   └── gemini_ai.py
     └── README.md
     
