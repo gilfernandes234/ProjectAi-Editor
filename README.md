@@ -60,7 +60,8 @@ Additional tools:\
 ### Multi-provider support
 
 -   ✅ Google Gemini\
--   🔜 Anthropic Claude (planned)\
+-   ✅ Ollama AI \
+-   🔜 Claude (planned)\
 -   🔜 OpenAI GPT (planned)
 
 ### Context-aware AI
