@@ -1,9 +1,12 @@
-# ProjectAI -- AI-Powered Code Editor
+# ProjectAI Editor -- AI-Powered Code Editor
 
 A modern, feature-rich code editor with integrated AI assistance
 
 Designed for developers who want intelligent coding support with
 professional editing tools.
+
+
+<img width="1919" height="1046" alt="Screenshot_2" src="https://github.com/user-attachments/assets/4ac2e626-23ba-4008-bbf5-06dbd9117a88" />
 
 ------------------------------------------------------------------------
 
@@ -103,6 +106,8 @@ Additional tools:\
 ## 🛠️ Installation
 
 ### Requirements
+
+https://img.shields.io/badge/Python-3.10+-eenlue
 
     Python 3.10+
 
