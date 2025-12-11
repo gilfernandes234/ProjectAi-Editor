@@ -178,57 +178,7 @@ python ProjectAI.py
     │   ├── base_ai.py
     │   └── gemini_ai.py
     └── README.md
-
-### Adding New AI Providers
-
-``` python
-from .base_ai import BaseAI
-
-class ClaudeAI(BaseAI):
-    def connect(self, api_key: str) -> tuple[bool, str]:
-        pass
-
-    def generate_response(self, prompt: str) -> str:
-        pass
-```
-
-Register provider:
-
-``` python
-self.available_providers = {
-    "Google Gemini": GeminiAI,
-    "Anthropic Claude": ClaudeAI,
-}
-```
-
-------------------------------------------------------------------------
-
-## 🎯 Keyboard Shortcuts Reference
-
-  Shortcut       Action
-  -------------- ---------------------------
-  Ctrl+N         New file
-  Ctrl+O         Open file
-  Ctrl+S         Save file
-  Ctrl+Shift+S   Save with encoding
-  Ctrl+D         Duplicate line
-  Ctrl+/         Toggle comment
-  Ctrl+F         Find & replace
-  Ctrl+Shift+D   Compare files
-  Ctrl+Shift+C   Toggle color highlighting
-  Ctrl+B         Toggle file explorer
-  Ctrl+Shift+A   Toggle AI chat
-
-------------------------------------------------------------------------
-
-## 🤝 Contributing
-
-1.  Fork the project\
-2.  Create a feature branch\
-3.  Commit changes\
-4.  Push to branch\
-5.  Open Pull Request
-
+    
 ------------------------------------------------------------------------
 
 ## 📝 License
